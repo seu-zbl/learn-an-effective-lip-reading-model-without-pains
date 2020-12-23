@@ -1,3 +1,8 @@
+！！！原项目为[Fengdalu/learn-an-effective-lip-reading-model-without-pains](https://github.com/Fengdalu/learn-an-effective-lip-reading-model-without-pains)
+
+为了方便基于此项目的研究，fork了一份！！！
+
+
 # Learn an Effective Lip Reading Model without Pains
 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/learn-an-effective-lip-reading-model-without/lipreading-on-lrw-1000)](https://paperswithcode.com/sota/lipreading-on-lrw-1000?p=learn-an-effective-lip-reading-model-without)
