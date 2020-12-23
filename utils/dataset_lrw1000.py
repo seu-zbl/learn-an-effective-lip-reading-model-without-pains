@@ -1,12 +1,10 @@
-from torch.utils.data import Dataset
-import cv2
 import os
 import glob
-import numpy as np
-import random
+
 from .cvtransforms import *
+
 import torch
-from collections import defaultdict
+from torch.utils.data import Dataset
 
 
 class LRW1000_Dataset(Dataset):
@@ -16,15 +14,13 @@ class LRW1000_Dataset(Dataset):
         self.args = args
         self.data = []
         self.phase = phase
-        if(self.phase == 'train'):
+        if self.phase == 'train':
             self.index_root = 'LRW1000_Public_pkl/trn'
         else:
-            self.index_root = 'LRW1000_Public_pkl/tst'                        
+            self.index_root = 'LRW1000_Public_pkl/tst'
         
         self.data = glob.glob(os.path.join(self.index_root, '*.pkl'))
-        
 
-                                
     def __len__(self):
         return len(self.data)
 
@@ -33,12 +29,11 @@ class LRW1000_Dataset(Dataset):
         pkl = torch.load(self.data[idx])
         video = pkl.get('video')
         
-        if(self.phase == 'train'):
+        if self.phase == 'train':
             video = RandomCrop(video, (88, 88))
             video = HorizontalFlip(video)
         elif self.phase == 'val' or self.phase == 'test':
-            video = CenterCrop(video, (88, 88))      
+            video = CenterCrop(video, (88, 88))
         
-        pkl['video'] = torch.FloatTensor(video)[:,None,...] / 255.0        
-                
+        pkl['video'] = torch.FloatTensor(video)[:, None, ...] / 255.0
         return pkl

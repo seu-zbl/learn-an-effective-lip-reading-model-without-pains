@@ -11,7 +11,8 @@ class LSR(nn.Module):
         self.e = e
         self.reduction = reduction
     
-    def _one_hot(self, labels, classes, value=1):
+    @staticmethod
+    def _one_hot(labels, classes, value=1):
         """
             Convert labels to one hot vectors
         
@@ -26,7 +27,7 @@ class LSR(nn.Module):
 
         one_hot = torch.zeros(labels.size(0), classes)
 
-        #labels and value_added  size must match
+        # labels and value_added  size must match
         labels = labels.view(labels.size(0), -1)
         value_added = torch.Tensor(labels.size(0), 1).fill_(value)
 
@@ -57,16 +58,15 @@ class LSR(nn.Module):
 
         if x.size(0) != target.size(0):
             raise ValueError('Expected input batchsize ({}) to match target batch_size({})'
-                    .format(x.size(0), target.size(0)))
+                             .format(x.size(0), target.size(0)))
 
         if x.dim() < 2:
             raise ValueError('Expected input tensor to have least 2 dimensions(got {})'
-                    .format(x.size(0)))
+                             .format(x.size(0)))
 
         if x.dim() != 2:
             raise ValueError('Only 2 dimension tensor are implemented, (got {})'
-                    .format(x.size()))
-
+                             .format(x.size()))
 
         smoothed_target = self._smooth_label(target, x.size(1), self.e)
         x = self.log_softmax(x)

@@ -1,12 +1,6 @@
-# coding: utf-8
 import math
-import numpy as np
 
-
-import torch
 import torch.nn as nn
-from torch.autograd import Variable
-import torch.nn.functional as F
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -15,7 +9,7 @@ def conv3x3(in_planes, out_planes, stride=1):
 
 
 def conv1x1(in_planes, out_planes, stride=1):
-    return nn.Conv2d(in_planes, out_planes, kernel_size=1)
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride)
 
 
 class BasicBlock(nn.Module):
@@ -31,8 +25,8 @@ class BasicBlock(nn.Module):
         self.downsample = downsample
         self.stride = stride
         self.se = se
-        
-        if(self.se):
+
+        if self.se:
             self.gap = nn.AdaptiveAvgPool2d(1)
             self.conv3 = conv1x1(planes, planes//16)
             self.conv4 = conv1x1(planes//16, planes)
@@ -48,7 +42,7 @@ class BasicBlock(nn.Module):
         if self.downsample is not None:
             residual = self.downsample(x)
             
-        if(self.se):
+        if self.se:
             w = self.gap(out)
             w = self.conv3(w)
             w = self.relu(w)
@@ -73,7 +67,6 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         
-        
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         
         self.bn = nn.BatchNorm1d(512)
@@ -97,8 +90,7 @@ class ResNet(nn.Module):
                 nn.BatchNorm2d(planes * block.expansion),
             )
 
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, se=self.se))
+        layers = [block(self.inplanes, planes, stride, downsample, se=self.se)]
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, se=self.se))
@@ -122,11 +114,11 @@ class VideoCNN(nn.Module):
         
         # frontend3D
         self.frontend3D = nn.Sequential(
-                nn.Conv3d(1, 64, kernel_size=(5, 7, 7), stride=(1, 2, 2), padding=(2, 3, 3), bias=False),
-                nn.BatchNorm3d(64),
-                nn.ReLU(True),
-                nn.MaxPool3d(kernel_size=(1, 3, 3), stride=(1, 2, 2), padding=(0, 1, 1))
-                )
+            nn.Conv3d(1, 64, kernel_size=(5, 7, 7), stride=(1, 2, 2), padding=(2, 3, 3), bias=False),
+            nn.BatchNorm3d(64),
+            nn.ReLU(True),
+            nn.MaxPool3d(kernel_size=(1, 3, 3), stride=(1, 2, 2), padding=(0, 1, 1))
+        )
         # resnet
         self.resnet18 = ResNet(BasicBlock, [2, 2, 2, 2], se=se)
         self.dropout = nn.Dropout(p=0.5)
@@ -149,8 +141,8 @@ class VideoCNN(nn.Module):
 
         x = self.visual_frontend_forward(x)
         
-        #x = self.dropout(x)
-        feat = x.view(b, -1, 512)
+        # x = self.dropout(x)
+        # feat = x.view(b, -1, 512)
 
         x = x.view(b, -1, 512)       
         return x
