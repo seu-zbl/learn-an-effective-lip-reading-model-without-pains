@@ -41,6 +41,8 @@ parser.add_argument('--border', type=str2bool, required=True)
 parser.add_argument('--mixup', type=str2bool, required=True)
 parser.add_argument('--label_smooth', type=str2bool, required=True)
 parser.add_argument('--se', type=str2bool, required=True)
+# finetune
+parser.add_argument('--finetune', type=str2bool, required=True, default=False)
 
 args = parser.parse_args()
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
@@ -56,11 +58,24 @@ video_model = VideoModel(args).cuda()
 
 
 def parallel_model(model):
+    """
+    多GPU计算
+
+    :param model:
+    :return:
+    """
     model = nn.DataParallel(model)
     return model
 
 
 def load_missing(model, pretrained_dict):
+    """
+    利用预训练模型对当前模型中具有同样结构的层，进行参数初始化
+
+    :param model: 当前模型
+    :param pretrained_dict: 加载的预训练模型参数
+    :return:
+    """
     model_dict = model.state_dict()
     pretrained_dict = {k: v for k, v in pretrained_dict.items() if
                        k in model_dict.keys() and v.size() == model_dict[k].size()}
@@ -73,7 +88,27 @@ def load_missing(model, pretrained_dict):
     return model
 
 
-optim_video = optim.Adam(video_model.parameters(), lr=args.lr, weight_decay=1e-4)
+# TODO: finetune 需要测试下代码是否有问题
+def freezing(model):
+    """
+    冻结全连接层之前的所有层
+
+    :param model:
+    :return:
+    """
+    for name, param in model.named_parameters():
+        if 'v_cls' in name or 'fc1' in name:
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
+
+
+if args.finetue:
+    freezing(video_model)
+    optim_video = optim.Adam(filter(lambda p: p.requires_grad, video_model.parameters()),
+                             lr=args.lr, weight_decay=1e-4)
+else:
+    optim_video = optim.Adam(video_model.parameters(), lr=args.lr, weight_decay=1e-4)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optim_video, T_max=args.max_epoch, eta_min=1e-6)
 
 if args.weights is not None:
@@ -85,6 +120,15 @@ video_model = parallel_model(video_model)
 
 
 def dataset2dataloader(dataset, batch_size, num_workers, shuffle=True):
+    """
+    数据集加载DataLoader
+
+    :param dataset:
+    :param batch_size:
+    :param num_workers:
+    :param shuffle:
+    :return:
+    """
     loader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -97,6 +141,14 @@ def dataset2dataloader(dataset, batch_size, num_workers, shuffle=True):
 
 
 def add_msg(msg, k, v):
+    """
+    逗号分割信息
+
+    :param msg:
+    :param k:
+    :param v:
+    :return:
+    """
     if msg != '':
         msg = msg + ','
     msg = msg + k.format(v)
@@ -114,7 +166,6 @@ def test():
         total = 0
 
         for i_iter, input in enumerate(loader):
-
             video_model.eval()
 
             tic = time.time()
@@ -135,7 +186,6 @@ def test():
                 msg = ''
                 msg = add_msg(msg, 'v_acc={:.5f}', np.array(v_acc).reshape(-1).mean())
                 msg = add_msg(msg, 'eta={:.5f}', (toc - tic) * (len(loader) - i_iter) / 3600.0)
-
                 print(msg)
 
         acc = float(np.array(v_acc).reshape(-1).mean())
@@ -144,6 +194,12 @@ def test():
 
 
 def showLR(optimizer):
+    """
+    获取学习率
+
+    :param optimizer:
+    :return:
+    """
     lr = []
     for param_group in optimizer.param_groups:
         lr += ['{:.6f}'.format(param_group['lr'])]
@@ -151,6 +207,12 @@ def showLR(optimizer):
 
 
 def AdjustLR(optimizer):
+    """
+    减半学习率
+
+    :param optimizer:
+    :return:
+    """
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr'] * 0.5
 
@@ -160,12 +222,10 @@ def train():
     print('Start Training, Data Length:', len(dataset))
 
     loader = dataset2dataloader(dataset, args.batch_size, args.num_workers)
-
-    max_epoch = args.max_epoch
-
     tot_iter = 0
     best_acc = 0.0
     alpha = 0.2
+    max_epoch = args.max_epoch
     for epoch in range(max_epoch):
         lsr = LSR()
 
@@ -187,10 +247,8 @@ def train():
             if args.mixup:
                 lambda_ = np.random.beta(alpha, alpha)
                 index = torch.randperm(video.size(0)).cuda(non_blocking=True)
-
                 mix_video = lambda_ * video + (1 - lambda_) * video[index, :]
                 mix_border = lambda_ * border + (1 - lambda_) * border[index, :]
-
                 label_a, label_b = label, label[index]
 
                 if args.border:
@@ -215,7 +273,6 @@ def train():
             optim_video.step()
 
             toc = time.time()
-
             if tot_iter % 10 == 0:
                 msg = 'epoch={},train_iter={},eta={:.5f}'\
                     .format(epoch, tot_iter, (toc - tic) * (len(loader) - i_iter) / 3600.0)
@@ -227,12 +284,9 @@ def train():
 
             test_interval = int((len(loader) - 1) * args.test_interval)
             if tot_iter % test_interval == 0:
-
                 acc, msg = test()
-
                 if acc > best_acc:
                     savename = '{}_iter_{}_epoch_{}_{}.pt'.format(args.save_prefix, tot_iter, epoch, msg)
-
                     temp = os.path.split(savename)[0]
                     if not os.path.exists(temp):
                         os.makedirs(temp)

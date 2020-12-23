@@ -2,6 +2,8 @@
 
 为了方便基于此项目的研究，fork了一份！！！
 
+- args添加了finetune参数，当在自己数据集上finetune训练时使用；会影响到网络的全连接层
+
 
 # Learn an Effective Lip Reading Model without Pains
 
